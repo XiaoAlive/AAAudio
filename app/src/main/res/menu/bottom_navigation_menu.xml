@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/navigation_songs"
+        android:icon="@drawable/ic_music_note"
+        android:title="歌曲" />
+    
+    <item
+        android:id="@+id/navigation_playlists"
+        android:icon="@drawable/ic_playlist"
+        android:title="歌单" />
+    
+    <item
+        android:id="@+id/navigation_albums"
+        android:icon="@drawable/ic_album"
+        android:title="专辑" />
+    
+    <item
+        android:id="@+id/navigation_artists"
+        android:icon="@drawable/ic_artist"
+        android:title="艺术家" />
+    
+    <item
+        android:id="@+id/navigation_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="设置" />
+</menu>

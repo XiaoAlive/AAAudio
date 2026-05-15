@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">AAAudio</string>
+    <string name="appbar_scrolling_view_behavior">androidx.coordinatorlayout.widget.ScrollingViewBehavior</string>
+    <string name="bottom_sheet_behavior">com.google.android.material.bottomsheet.BottomSheetBehavior</string>
+    <string name="create_playlist">新建歌单</string>
+    <string name="edit_playlist">编辑歌单</string>
+    <string name="delete_playlist">删除歌单</string>
+    <string name="add_songs">添加歌曲</string>
+    <string name="play_all">播放全部</string>
+    <string name="filter">筛选</string>
+    <string name="search">搜索</string>
+    <string name="done">完成</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确定</string>
+    <string name="playlist_name_hint">歌单名称（最多20个字符）</string>
+    <string name="no_songs_in_playlist">暂无歌曲</string>
+    <string name="drag_sort_hint">拖动排序</string>
+    <string name="save_sort">排序已保存</string>
+    <string name="delete_playlist_confirm">确定要删除歌单吗？此操作不可撤销。</string>
+    <string name="select_songs">选择歌曲</string>
+</resources>
