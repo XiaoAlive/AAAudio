@@ -331,13 +331,9 @@ public class SelectSongsActivity extends AppCompatActivity {
                     existingLabel.setVisibility(View.GONE);
                     container.setEnabled(true);
                     container.setAlpha(1.0f);
-                    checkBox.setChecked(isSelected);
-
-                    container.setOnClickListener(v -> {
-                        checkBox.setChecked(!checkBox.isChecked());
-                    });
 
                     checkBox.setOnCheckedChangeListener(null);
+                    checkBox.setChecked(isSelected);
                     checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
                         if (isChecked) {
                             selectedIds.add(song.getId());
@@ -345,6 +341,10 @@ public class SelectSongsActivity extends AppCompatActivity {
                             selectedIds.remove(song.getId());
                         }
                         notifySelectionChanged();
+                    });
+
+                    container.setOnClickListener(v -> {
+                        checkBox.setChecked(!checkBox.isChecked());
                     });
                 }
             }

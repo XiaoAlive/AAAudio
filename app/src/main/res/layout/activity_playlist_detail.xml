@@ -7,6 +7,7 @@
     android:background="@color/background">
 
     <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appbar_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:theme="@style/Theme.AAAudio">
@@ -57,6 +58,7 @@
         </androidx.appcompat.widget.Toolbar>
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/top_control_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
@@ -279,5 +281,19 @@
         </LinearLayout>
 
     </LinearLayout>
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_locate_song"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="80dp"
+        android:src="@drawable/ic_crosshair"
+        android:visibility="gone"
+        android:elevation="6dp"
+        app:fabSize="mini"
+        app:tint="@color/text_primary"
+        app:backgroundTint="@color/white" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

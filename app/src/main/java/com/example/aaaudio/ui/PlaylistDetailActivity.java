@@ -33,6 +33,7 @@ import com.example.aaaudio.model.PlaylistSongCrossRef;
 import com.example.aaaudio.model.Song;
 import com.example.aaaudio.service.SimpleAudioPlayerManager;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -67,6 +68,8 @@ public class PlaylistDetailActivity extends AppCompatActivity {
     private ImageView albumArt;
     private TextView bottomSongTitle, bottomSongArtist;
     private View bottomPlayerControl;
+    private FloatingActionButton fabLocateSong;
+    private View topControlBar;
 
     private Handler playbackUpdateHandler;
     private Runnable playbackUpdateRunnable;
@@ -111,6 +114,8 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         btnPlaylist = findViewById(R.id.btn_playlist);
         bottomSongTitle = findViewById(R.id.song_title);
         bottomSongArtist = findViewById(R.id.song_artist);
+        fabLocateSong = findViewById(R.id.fab_locate_song);
+        topControlBar = findViewById(R.id.top_control_bar);
     }
 
     private void setupToolbar() {
@@ -148,9 +153,55 @@ public class PlaylistDetailActivity extends AppCompatActivity {
             public boolean isLongPressDragEnabled() {
                 return false;
             }
+
+            @Override
+            public void onSelectedChanged(RecyclerView.ViewHolder viewHolder, int actionState) {
+                super.onSelectedChanged(viewHolder, actionState);
+                if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
+                    fabLocateSong.setVisibility(View.GONE);
+                }
+            }
+
+            @Override
+            public void clearView(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
+                super.clearView(recyclerView, viewHolder);
+                adapter.onDragEnd();
+            }
         };
         itemTouchHelper = new ItemTouchHelper(callback);
         itemTouchHelper.attachToRecyclerView(recyclerView);
+
+        recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                super.onScrollStateChanged(recyclerView, newState);
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    if (!isBatchMode) {
+                        fabLocateSong.setEnabled(true);
+                        fabLocateSong.setAlpha(1.0f);
+                    }
+                } else {
+                    if (fabLocateSong.getVisibility() == View.VISIBLE) {
+                        fabLocateSong.setEnabled(false);
+                        fabLocateSong.setAlpha(0.4f);
+                    }
+                }
+            }
+
+            @Override
+            public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                if (dy != 0 && fabLocateSong.getVisibility() != View.VISIBLE && !isBatchMode && isCurrentSongInPlaylist()) {
+                    fabLocateSong.setVisibility(View.VISIBLE);
+                    if (recyclerView.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) {
+                        fabLocateSong.setEnabled(false);
+                        fabLocateSong.setAlpha(0.4f);
+                    }
+                }
+            }
+        });
+
+        fabLocateSong.setOnClickListener(v -> scrollToCurrentSong());
 
         adapter.setOnSongActionListener(new PlaylistDetailAdapter.OnSongActionListener() {
             @Override
@@ -256,11 +307,30 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         if (currentSong != null) {
             bottomSongTitle.setText(currentSong.getTitle());
             bottomSongArtist.setText(currentSong.getArtist());
+            adapter.setCurrentPlayingSongId(currentSong.getId());
         } else {
             bottomSongTitle.setText("未在播放");
             bottomSongArtist.setText("选择歌曲开始播放");
+            adapter.setCurrentPlayingSongId(-1);
         }
         bottomPlayerControl.setVisibility(View.VISIBLE);
+
+        if (fabLocateSong.getVisibility() == View.VISIBLE && !isCurrentSongInPlaylist()) {
+            fabLocateSong.setVisibility(View.GONE);
+        }
+    }
+
+    private boolean isCurrentSongInPlaylist() {
+        Song currentSong = audioPlayerManager.getCurrentSong();
+        if (currentSong == null || currentSongs.isEmpty()) {
+            return false;
+        }
+        for (Song song : currentSongs) {
+            if (song.getId() == currentSong.getId()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void loadPlaylist() {
@@ -305,7 +375,13 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         adapter.setBatchMode(isBatchMode);
         batchModeBar.setVisibility(isBatchMode ? View.VISIBLE : View.GONE);
         if (isBatchMode) {
+            toolbar.setVisibility(View.GONE);
+            topControlBar.setVisibility(View.GONE);
+            fabLocateSong.setVisibility(View.GONE);
             cbSelectAll.setChecked(false);
+        } else {
+            toolbar.setVisibility(View.VISIBLE);
+            topControlBar.setVisibility(View.VISIBLE);
         }
     }
 
@@ -313,6 +389,8 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         isBatchMode = false;
         adapter.setBatchMode(false);
         batchModeBar.setVisibility(View.GONE);
+        toolbar.setVisibility(View.VISIBLE);
+        topControlBar.setVisibility(View.VISIBLE);
         saveSortedOrder();
     }
 
@@ -347,6 +425,29 @@ public class PlaylistDetailActivity extends AppCompatActivity {
                 currentSongs = new ArrayList<>(sortedList);
             }
         }.execute();
+    }
+
+    private void scrollToCurrentSong() {
+        Song currentSong = audioPlayerManager.getCurrentSong();
+        if (currentSong == null) {
+            Toast.makeText(this, "当前没有正在播放的歌曲", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        List<Song> songs = adapter.getCurrentList();
+        int targetPosition = -1;
+        for (int i = 0; i < songs.size(); i++) {
+            if (songs.get(i).getId() == currentSong.getId()) {
+                targetPosition = i;
+                break;
+            }
+        }
+        if (targetPosition >= 0) {
+            recyclerView.smoothScrollToPosition(targetPosition);
+            fabLocateSong.setEnabled(false);
+            fabLocateSong.setAlpha(0.4f);
+        } else {
+            Toast.makeText(this, "当前歌曲不在这个歌单中", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void showBatchDeleteConfirm() {

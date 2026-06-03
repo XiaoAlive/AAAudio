@@ -17,4 +17,5 @@
     <color name="background">#FFF5F5F5</color>
     <color name="text_primary">#FF212121</color>
     <color name="text_secondary">#FF757575</color>
+    <color name="highlight_bg">#FFE3F2FD</color>
 </resources>

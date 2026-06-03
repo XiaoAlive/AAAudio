@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.aaaudio.R;
 import com.example.aaaudio.model.Song;
+import com.google.android.material.card.MaterialCardView;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,6 +25,7 @@ public class PlaylistDetailAdapter extends RecyclerView.Adapter<PlaylistDetailAd
     private List<Song> songList = new ArrayList<>();
     private boolean isBatchMode = false;
     private Set<Long> selectedIds = new HashSet<>();
+    private long currentPlayingSongId = -1;
     private OnSongActionListener listener;
 
     public interface OnSongActionListener {
@@ -42,6 +44,13 @@ public class PlaylistDetailAdapter extends RecyclerView.Adapter<PlaylistDetailAd
 
     public List<Song> getCurrentList() {
         return new ArrayList<>(songList);
+    }
+
+    public void setCurrentPlayingSongId(long songId) {
+        if (this.currentPlayingSongId != songId) {
+            this.currentPlayingSongId = songId;
+            notifyDataSetChanged();
+        }
     }
 
     public void setBatchMode(boolean batchMode) {
@@ -92,6 +101,10 @@ public class PlaylistDetailAdapter extends RecyclerView.Adapter<PlaylistDetailAd
         notifyItemMoved(fromPosition, toPosition);
     }
 
+    public void onDragEnd() {
+        notifyDataSetChanged();
+    }
+
     public void removeSelected() {
         List<Song> toRemove = new ArrayList<>();
         for (Song song : songList) {
@@ -125,7 +138,7 @@ public class PlaylistDetailAdapter extends RecyclerView.Adapter<PlaylistDetailAd
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Song song = songList.get(position);
-        holder.bind(song, position, listener, isBatchMode, selectedIds);
+        holder.bind(song, position, listener, isBatchMode, selectedIds, currentPlayingSongId);
     }
 
     @Override
@@ -138,6 +151,7 @@ public class PlaylistDetailAdapter extends RecyclerView.Adapter<PlaylistDetailAd
         private final TextView artistText;
         private final CheckBox checkBox;
         private final ImageView dragHandle;
+        private final MaterialCardView cardView;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -145,19 +159,19 @@ public class PlaylistDetailAdapter extends RecyclerView.Adapter<PlaylistDetailAd
             artistText = itemView.findViewById(R.id.song_artist);
             checkBox = itemView.findViewById(R.id.checkbox_select);
             dragHandle = itemView.findViewById(R.id.drag_handle);
+            cardView = (MaterialCardView) itemView;
         }
 
         void bind(final Song song, final int position, final OnSongActionListener listener,
-                   boolean isBatchMode, Set<Long> selectedIds) {
+                   boolean isBatchMode, Set<Long> selectedIds, long currentPlayingSongId) {
             titleText.setText(song.getTitle());
             artistText.setText(song.getArtist());
 
             checkBox.setVisibility(isBatchMode ? View.VISIBLE : View.GONE);
             dragHandle.setVisibility(isBatchMode ? View.VISIBLE : View.GONE);
 
-            checkBox.setChecked(selectedIds.contains(song.getId()));
-
             checkBox.setOnCheckedChangeListener(null);
+            checkBox.setChecked(selectedIds.contains(song.getId()));
             checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 if (isChecked) {
                     selectedIds.add(song.getId());
@@ -165,6 +179,19 @@ public class PlaylistDetailAdapter extends RecyclerView.Adapter<PlaylistDetailAd
                     selectedIds.remove(song.getId());
                 }
             });
+
+            boolean isPlaying = !isBatchMode && song.getId() == currentPlayingSongId;
+            if (isPlaying) {
+                cardView.setCardBackgroundColor(itemView.getContext().getColor(R.color.highlight_bg));
+                cardView.setStrokeColor(itemView.getContext().getColor(R.color.colorPrimary));
+                cardView.setStrokeWidth(2);
+                titleText.setTextColor(itemView.getContext().getColor(R.color.colorPrimaryDark));
+            } else {
+                cardView.setCardBackgroundColor(itemView.getContext().getColor(android.R.color.white));
+                cardView.setStrokeColor(itemView.getContext().getColor(R.color.light_gray));
+                cardView.setStrokeWidth(1);
+                titleText.setTextColor(itemView.getContext().getColor(R.color.text_primary));
+            }
 
             itemView.setOnClickListener(v -> {
                 if (isBatchMode) {
