@@ -15,6 +15,9 @@
     <!-- 前台服务权限 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     
+    <!-- 通知权限（Android 13+） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
     <!-- 唤醒锁定权限 -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 

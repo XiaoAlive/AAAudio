@@ -15,6 +15,9 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.support.v4.media.MediaMetadataCompat;
+import android.support.v4.media.session.MediaSessionCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import com.example.aaaudio.MainActivity;
@@ -43,6 +46,7 @@ public class AudioPlayerService extends Service implements
     private AudioManager audioManager;
     private AudioFocusRequest focusRequest;
     private PowerManager.WakeLock wakeLock;
+    private MediaSessionCompat mediaSession;
 
     private List<Song> currentPlaylist;
     private int currentPosition;
@@ -68,6 +72,7 @@ public class AudioPlayerService extends Service implements
         
         initializeMediaPlayer();
         initializeAudioManager();
+        initializeMediaSession();
         createNotificationChannel();
         acquireWakeLock();
         
@@ -76,6 +81,84 @@ public class AudioPlayerService extends Service implements
         currentPosition = -1;
 
         restoreState();
+    }
+
+    private void initializeMediaSession() {
+        mediaSession = new MediaSessionCompat(this, TAG);
+        mediaSession.setFlags(
+                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS |
+                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+        );
+        mediaSession.setCallback(new MediaSessionCompat.Callback() {
+            @Override
+            public void onPlay() {
+                super.onPlay();
+                Log.d(TAG, "MediaSession: onPlay");
+                if (!isPlaying() && isPrepared) {
+                    mediaPlayer.start();
+                    requestAudioFocus();
+                    updateNotification();
+                    updateMediaSessionState();
+                }
+            }
+
+            @Override
+            public void onPause() {
+                super.onPause();
+                Log.d(TAG, "MediaSession: onPause");
+                if (isPlaying()) {
+                    mediaPlayer.pause();
+                    updateNotification();
+                    updateMediaSessionState();
+                }
+            }
+
+            @Override
+            public void onSkipToNext() {
+                super.onSkipToNext();
+                Log.d(TAG, "MediaSession: onSkipToNext");
+                next();
+            }
+
+            @Override
+            public void onSkipToPrevious() {
+                super.onSkipToPrevious();
+                Log.d(TAG, "MediaSession: onSkipToPrevious");
+                previous();
+            }
+
+            @Override
+            public void onStop() {
+                super.onStop();
+                Log.d(TAG, "MediaSession: onStop");
+                stop();
+                updateNotification();
+                updateMediaSessionState();
+            }
+
+            @Override
+            public void onSeekTo(long pos) {
+                super.onSeekTo(pos);
+                Log.d(TAG, "MediaSession: onSeekTo " + pos);
+                seekTo((int) pos);
+            }
+        });
+
+        // 设置初始播放状态
+        PlaybackStateCompat initialState = new PlaybackStateCompat.Builder()
+                .setState(PlaybackStateCompat.STATE_NONE, 0, 1.0f)
+                .setActions(
+                        PlaybackStateCompat.ACTION_PLAY |
+                        PlaybackStateCompat.ACTION_PAUSE |
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE |
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT |
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS |
+                        PlaybackStateCompat.ACTION_STOP |
+                        PlaybackStateCompat.ACTION_SEEK_TO
+                )
+                .build();
+        mediaSession.setPlaybackState(initialState);
+        mediaSession.setActive(true);
     }
 
     private void restoreState() {
@@ -148,6 +231,12 @@ public class AudioPlayerService extends Service implements
 
         saveState();
         
+        if (mediaSession != null) {
+            mediaSession.setActive(false);
+            mediaSession.release();
+            mediaSession = null;
+        }
+        
         releaseMediaPlayer();
         releaseAudioFocus();
         releaseWakeLock();
@@ -216,6 +305,8 @@ public class AudioPlayerService extends Service implements
 
         // 播放/暂停按钮
         boolean isPlaying = isPlaying();
+        int playIcon = isPlaying ? R.drawable.ic_pause : R.drawable.ic_play;
+        String playText = isPlaying ? "暂停" : "播放";
         PendingIntent playPauseIntent = PendingIntent.getService(this, 2,
                 new Intent(ACTION_PLAY_PAUSE, null, this, AudioPlayerService.class),
                 PendingIntent.FLAG_IMMUTABLE);
@@ -230,11 +321,13 @@ public class AudioPlayerService extends Service implements
                 .setContentText(artist)
                 .setSmallIcon(R.drawable.ic_music_note)
                 .setContentIntent(pendingIntent)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 确保锁屏可见
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
+                        .setMediaSession(mediaSession.getSessionToken())
                         .setShowActionsInCompactView(0, 1, 2))
                 .addAction(R.drawable.ic_previous, "上一首", prevIntent)
-                .addAction(isPlaying ? R.drawable.ic_pause : R.drawable.ic_play, isPlaying ? "暂停" : "播放", playPauseIntent)
+                .addAction(playIcon, playText, playPauseIntent)
                 .addAction(R.drawable.ic_skip_next, "下一首", nextIntent);
 
         return builder.build();
@@ -497,6 +590,52 @@ public class AudioPlayerService extends Service implements
         if (manager != null) {
             manager.notify(NOTIFICATION_ID, createNotification());
         }
+        updateMediaSessionState();
+    }
+
+    private void updateMediaSessionState() {
+        if (mediaSession == null) return;
+        
+        // 更新播放状态
+        int state = PlaybackStateCompat.STATE_NONE;
+        if (mediaPlayer != null) {
+            if (mediaPlayer.isPlaying()) {
+                state = PlaybackStateCompat.STATE_PLAYING;
+            } else if (isPrepared) {
+                state = PlaybackStateCompat.STATE_PAUSED;
+            }
+        }
+        
+        long position = mediaPlayer != null && isPrepared ? mediaPlayer.getCurrentPosition() : 0;
+        float speed = mediaPlayer != null && mediaPlayer.isPlaying() ? 1.0f : 0f;
+        
+        PlaybackStateCompat playbackState = new PlaybackStateCompat.Builder()
+                .setState(state, position, speed)
+                .setActions(
+                        PlaybackStateCompat.ACTION_PLAY |
+                        PlaybackStateCompat.ACTION_PAUSE |
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE |
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT |
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS |
+                        PlaybackStateCompat.ACTION_STOP |
+                        PlaybackStateCompat.ACTION_SEEK_TO
+                )
+                .build();
+        mediaSession.setPlaybackState(playbackState);
+        
+        // 更新媒体元数据（歌曲信息）
+        Song currentSong = getCurrentSong();
+        if (currentSong != null) {
+            MediaMetadataCompat.Builder metadataBuilder = new MediaMetadataCompat.Builder()
+                    .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentSong.getTitle() != null ? currentSong.getTitle() : "")
+                    .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, currentSong.getArtist() != null ? currentSong.getArtist() : "")
+                    .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, currentSong.getAlbum() != null ? currentSong.getAlbum() : "")
+                    .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, mediaPlayer != null && isPrepared ? mediaPlayer.getDuration() : 0L);
+            
+            mediaSession.setMetadata(metadataBuilder.build());
+        }
+        
+        mediaSession.setActive(true);
     }
 
     // 获取播放状态
