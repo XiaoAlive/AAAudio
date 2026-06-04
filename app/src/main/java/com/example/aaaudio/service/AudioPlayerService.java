@@ -34,6 +34,11 @@ public class AudioPlayerService extends Service implements
     private static final String CHANNEL_ID = "audio_player_channel";
     private static final int NOTIFICATION_ID = 1;
 
+    // 通知栏操作Action
+    public static final String ACTION_PREVIOUS = "com.example.aaaudio.ACTION_PREVIOUS";
+    public static final String ACTION_PLAY_PAUSE = "com.example.aaaudio.ACTION_PLAY_PAUSE";
+    public static final String ACTION_NEXT = "com.example.aaaudio.ACTION_NEXT";
+
     private MediaPlayer mediaPlayer;
     private AudioManager audioManager;
     private AudioFocusRequest focusRequest;
@@ -110,6 +115,23 @@ public class AudioPlayerService extends Service implements
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "Service onStartCommand");
+
+        if (intent != null && intent.getAction() != null) {
+            String action = intent.getAction();
+            Log.d(TAG, "Received action: " + action);
+            switch (action) {
+                case ACTION_PREVIOUS:
+                    previous();
+                    break;
+                case ACTION_PLAY_PAUSE:
+                    playPause();
+                    break;
+                case ACTION_NEXT:
+                    next();
+                    break;
+            }
+        }
+
         startForeground(NOTIFICATION_ID, createNotification());
         return START_STICKY;
     }
@@ -178,16 +200,44 @@ public class AudioPlayerService extends Service implements
 
     private Notification createNotification() {
         Intent notificationIntent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 
+        notificationIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent,
                 PendingIntent.FLAG_IMMUTABLE);
 
-        return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("音频播放器")
-                .setContentText("正在播放音乐")
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+        // 获取当前歌曲信息
+        Song currentSong = getCurrentSong();
+        String title = currentSong != null ? currentSong.getTitle() : "音频播放器";
+        String artist = currentSong != null ? currentSong.getArtist() : "正在播放音乐";
+
+        // 上一首按钮
+        PendingIntent prevIntent = PendingIntent.getService(this, 1,
+                new Intent(ACTION_PREVIOUS, null, this, AudioPlayerService.class),
+                PendingIntent.FLAG_IMMUTABLE);
+
+        // 播放/暂停按钮
+        boolean isPlaying = isPlaying();
+        PendingIntent playPauseIntent = PendingIntent.getService(this, 2,
+                new Intent(ACTION_PLAY_PAUSE, null, this, AudioPlayerService.class),
+                PendingIntent.FLAG_IMMUTABLE);
+
+        // 下一首按钮
+        PendingIntent nextIntent = PendingIntent.getService(this, 3,
+                new Intent(ACTION_NEXT, null, this, AudioPlayerService.class),
+                PendingIntent.FLAG_IMMUTABLE);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle(title)
+                .setContentText(artist)
+                .setSmallIcon(R.drawable.ic_music_note)
                 .setContentIntent(pendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
-                .build();
+                .setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
+                        .setShowActionsInCompactView(0, 1, 2))
+                .addAction(R.drawable.ic_previous, "上一首", prevIntent)
+                .addAction(isPlaying ? R.drawable.ic_pause : R.drawable.ic_play, isPlaying ? "暂停" : "播放", playPauseIntent)
+                .addAction(R.drawable.ic_skip_next, "下一首", nextIntent);
+
+        return builder.build();
     }
 
     private void acquireWakeLock() {
@@ -291,6 +341,8 @@ public class AudioPlayerService extends Service implements
             mediaPlayer.start();
             requestAudioFocus();
         }
+        
+        updateNotification();
     }
 
     private void saveState() {
@@ -441,7 +493,10 @@ public class AudioPlayerService extends Service implements
     }
 
     private void updateNotification() {
-        // TODO: 更新通知内容
+        NotificationManager manager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager != null) {
+            manager.notify(NOTIFICATION_ID, createNotification());
+        }
     }
 
     // 获取播放状态
